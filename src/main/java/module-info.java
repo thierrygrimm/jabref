@@ -7,6 +7,7 @@ open module org.jabref {
 
     // Uebung 3
     requires swenglib;
+    requires com.opencsv;
 
     // JavaFX
     requires javafx.base;
