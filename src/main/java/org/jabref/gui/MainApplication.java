@@ -9,6 +9,8 @@ import org.jabref.gui.openoffice.OOBibBaseConnect;
 import org.jabref.logic.importer.ParserResult;
 import org.jabref.preferences.JabRefPreferences;
 
+import ch.unibas.informatik.sweng.HelloSweng;
+
 /**
  * JabRef's main class to process command line options and to start the UI
  */
@@ -18,6 +20,9 @@ public class MainApplication extends Application {
     private static JabRefPreferences preferences;
 
     public static void main(List<ParserResult> parserResults, boolean blank, JabRefPreferences preferences, String[] args) {
+        String greeting = HelloSweng.greeting();
+        System.out.println(greeting);
+
         MainApplication.parserResults = parserResults;
         MainApplication.isBlank = blank;
         MainApplication.preferences = preferences;

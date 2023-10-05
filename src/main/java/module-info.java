@@ -5,6 +5,9 @@ open module org.jabref {
     // SQL
     requires java.sql;
 
+    // Uebung 3
+    requires swenglib;
+
     // JavaFX
     requires javafx.base;
     requires javafx.graphics;
