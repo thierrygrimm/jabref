@@ -258,6 +258,7 @@ public class IconTheme {
         INTEGRITY_WARN(MaterialDesignA.ALERT_CIRCLE),
         INTEGRITY_SUCCESS(MaterialDesignC.CHECKBOX_MARKED_CIRCLE_OUTLINE),
         GITHUB(MaterialDesignG.GITHUB),
+        LECTURE(MaterialDesignS.SCHOOL),
         TOGGLE_ENTRY_PREVIEW(MaterialDesignL.LIBRARY),
         TOGGLE_GROUPS(MaterialDesignV.VIEW_LIST),
         SHOW_PREFERENCES_LIST(MaterialDesignV.VIEW_LIST),
