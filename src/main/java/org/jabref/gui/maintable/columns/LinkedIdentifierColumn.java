@@ -7,8 +7,10 @@ import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.MouseButton;
 
 import org.jabref.gui.DialogService;
+import org.jabref.gui.StateManager;
 import org.jabref.gui.desktop.JabRefDesktop;
 import org.jabref.gui.icon.IconTheme;
 import org.jabref.gui.maintable.BibEntryTableViewModel;
@@ -16,12 +18,13 @@ import org.jabref.gui.maintable.CellFactory;
 import org.jabref.gui.maintable.ColumnPreferences;
 import org.jabref.gui.maintable.MainTableColumnFactory;
 import org.jabref.gui.maintable.MainTableColumnModel;
+import org.jabref.gui.maintable.OpenUrlAction;
 import org.jabref.gui.util.ControlHelper;
 import org.jabref.gui.util.ValueTableCellFactory;
 import org.jabref.logic.l10n.Localization;
 import org.jabref.model.database.BibDatabaseContext;
 import org.jabref.model.entry.field.Field;
-import org.jabref.model.entry.field.StandardField;
+import org.jabref.preferences.PreferencesService;
 
 /**
  * A clickable icons column for DOIs, URLs, URIs and EPrints.
@@ -31,15 +34,19 @@ public class LinkedIdentifierColumn extends MainTableColumn<Map<Field, String>> 
     private final BibDatabaseContext database;
     private final CellFactory cellFactory;
     private final DialogService dialogService;
+    private final PreferencesService preferences;
 
     public LinkedIdentifierColumn(MainTableColumnModel model,
                                   CellFactory cellFactory,
                                   BibDatabaseContext database,
-                                  DialogService dialogService) {
+                                  DialogService dialogService,
+                                  PreferencesService preferences,
+                                  StateManager stateManager) {
         super(model);
         this.database = database;
         this.cellFactory = cellFactory;
         this.dialogService = dialogService;
+        this.preferences = preferences;
 
         Node headerGraphic = IconTheme.JabRefIcons.WWW.getGraphicNode();
         Tooltip.install(headerGraphic, new Tooltip(Localization.lang("Linked identifiers")));
@@ -52,14 +59,22 @@ public class LinkedIdentifierColumn extends MainTableColumn<Map<Field, String>> 
                 .withGraphic(this::createIdentifierGraphic)
                 .withTooltip(this::createIdentifierTooltip)
                 .withMenu(this::createIdentifierMenu)
+                .withOnMouseClickedEvent((entry, linkedFiles) -> event -> {
+                    // If we only have one identifer, open directly
+                    if ((linkedFiles.size() == 1) && (event.getButton() == MouseButton.PRIMARY)) {
+                       new OpenUrlAction(dialogService, stateManager, preferences).execute();
+                    }
+                })
                 .install(this);
     }
 
     private Node createIdentifierGraphic(Map<Field, String> values) {
-        if (values.isEmpty()) {
-            return null;
+        if (values.size() > 1) {
+            return IconTheme.JabRefIcons.LINK_VARIANT.getGraphicNode();
+        } else if (values.size() == 1) {
+            return IconTheme.JabRefIcons.LINK.getGraphicNode();
         } else {
-            return cellFactory.getTableIcon(StandardField.URL);
+            return null;
         }
     }
 
@@ -72,13 +87,17 @@ public class LinkedIdentifierColumn extends MainTableColumn<Map<Field, String>> 
     private ContextMenu createIdentifierMenu(BibEntryTableViewModel entry, Map<Field, String> values) {
         ContextMenu contextMenu = new ContextMenu();
 
+        if (values.size() <= 1) {
+            return null;
+        }
+
         values.keySet().forEach(field -> {
             MenuItem menuItem = new MenuItem(field.getDisplayName() + ": " +
                     ControlHelper.truncateString(values.get(field), -1, "...", ControlHelper.EllipsisPosition.CENTER),
                     cellFactory.getTableIcon(field));
             menuItem.setOnAction(event -> {
                 try {
-                    JabRefDesktop.openExternalViewer(database, values.get(field), field);
+                    JabRefDesktop.openExternalViewer(database, preferences, values.get(field), field);
                 } catch (IOException e) {
                     dialogService.showErrorDialogAndWait(Localization.lang("Unable to open link."), e);
                 }

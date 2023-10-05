@@ -8,43 +8,57 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
 
-import org.jabref.JabRefGUI;
 import org.jabref.gui.DialogService;
+import org.jabref.gui.JabRefGUI;
 import org.jabref.gui.autocompleter.SuggestionProvider;
 import org.jabref.gui.desktop.JabRefDesktop;
 import org.jabref.gui.mergeentries.FetchAndMergeEntry;
 import org.jabref.gui.util.BackgroundTask;
 import org.jabref.gui.util.TaskExecutor;
+import org.jabref.logic.importer.FetcherClientException;
+import org.jabref.logic.importer.FetcherServerException;
 import org.jabref.logic.importer.WebFetchers;
 import org.jabref.logic.importer.util.IdentifierParser;
 import org.jabref.logic.integrity.FieldCheckers;
 import org.jabref.logic.l10n.Localization;
 import org.jabref.model.entry.BibEntry;
 import org.jabref.model.entry.field.Field;
+import org.jabref.model.entry.field.StandardField;
+import org.jabref.model.entry.identifier.DOI;
 import org.jabref.model.entry.identifier.Identifier;
+import org.jabref.preferences.PreferencesService;
 
 import com.tobiasdiez.easybind.EasyBind;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class IdentifierEditorViewModel extends AbstractEditorViewModel {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(IdentifierEditorViewModel.class);
+
     private final BooleanProperty validIdentifierIsNotPresent = new SimpleBooleanProperty(true);
     private final BooleanProperty identifierLookupInProgress = new SimpleBooleanProperty(false);
     private final BooleanProperty idFetcherAvailable = new SimpleBooleanProperty(true);
     private final ObjectProperty<Optional<? extends Identifier>> identifier = new SimpleObjectProperty<>();
     private final TaskExecutor taskExecutor;
     private final DialogService dialogService;
+    private final Field field;
+    private final PreferencesService preferences;
 
-    public IdentifierEditorViewModel(Field field, SuggestionProvider<?> suggestionProvider, TaskExecutor taskExecutor, DialogService dialogService, FieldCheckers fieldCheckers) {
+    public IdentifierEditorViewModel(Field field, SuggestionProvider<?> suggestionProvider, TaskExecutor taskExecutor, DialogService dialogService, FieldCheckers fieldCheckers, PreferencesService preferences) {
         super(field, suggestionProvider, fieldCheckers);
 
         this.taskExecutor = taskExecutor;
         this.dialogService = dialogService;
+        this.preferences = preferences;
+        this.field = field;
 
         identifier.bind(
                 EasyBind.map(text, input -> IdentifierParser.parse(field, input))
         );
 
         validIdentifierIsNotPresent.bind(
-                EasyBind.map(identifier, parsedIdentifier -> !parsedIdentifier.isPresent())
+                EasyBind.map(identifier, parsedIdentifier -> parsedIdentifier.isEmpty())
         );
 
         idFetcherAvailable.setValue(WebFetchers.getIdFetcherForField(field).isPresent());
@@ -67,6 +81,15 @@ public class IdentifierEditorViewModel extends AbstractEditorViewModel {
     }
 
     public void openExternalLink() {
+        if (field.equals(StandardField.DOI) && preferences.getDOIPreferences().isUseCustom()) {
+            identifier.get().map(identifier -> (DOI) identifier).map(DOI::getDOI)
+                      .ifPresent(s -> JabRefDesktop.openCustomDoi(s, preferences, dialogService));
+        } else {
+            openExternalLinkDefault();
+        }
+    }
+
+    public void openExternalLinkDefault() {
         identifier.get().flatMap(Identifier::getExternalURI).ifPresent(
                 url -> {
                     try {
@@ -87,7 +110,7 @@ public class IdentifierEditorViewModel extends AbstractEditorViewModel {
     }
 
     public void fetchInformationByIdentifier(BibEntry entry) {
-        new FetchAndMergeEntry(JabRefGUI.getMainFrame().getCurrentBasePanel(), taskExecutor).fetchAndMerge(entry, field);
+        new FetchAndMergeEntry(JabRefGUI.getMainFrame().getCurrentLibraryTab(), taskExecutor, preferences, dialogService).fetchAndMerge(entry, field);
     }
 
     public void lookupIdentifier(BibEntry entry) {
@@ -103,8 +126,19 @@ public class IdentifierEditorViewModel extends AbstractEditorViewModel {
                             dialogService.notify(Localization.lang("No %0 found", field.getDisplayName()));
                         }
                     })
-                    .onFailure(dialogService::showErrorDialogAndWait)
-                    .executeWith(taskExecutor);
+                      .onFailure(exception -> {
+                          LOGGER.error("Error while fetching bibliographic information", exception);
+                          if (exception instanceof FetcherClientException) {
+                              dialogService.showInformationDialogAndWait(Localization.lang("Look up %0", idFetcher.getName()), Localization.lang("No data was found for the identifier"));
+                          } else if (exception instanceof FetcherServerException) {
+                              dialogService.showInformationDialogAndWait(Localization.lang("Look up %0", idFetcher.getName()), Localization.lang("Server not available"));
+                          } else if (exception.getCause() != null) {
+                              dialogService.showWarningDialogAndWait(Localization.lang("Look up %0", idFetcher.getName()), Localization.lang("Error occured %0", exception.getCause().getMessage()));
+                          } else {
+                              dialogService.showWarningDialogAndWait(Localization.lang("Look up %0", idFetcher.getName()), Localization.lang("Error occured %0", exception.getCause().getMessage()));
+                          }
+                      })
+                      .executeWith(taskExecutor);
         });
     }
 }

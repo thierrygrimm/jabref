@@ -10,7 +10,7 @@ import org.jabref.model.entry.field.Field;
 import org.jabref.model.entry.field.FieldFactory;
 import org.jabref.model.entry.field.InternalField;
 import org.jabref.model.entry.field.StandardField;
-import org.jabref.model.metadata.FilePreferences;
+import org.jabref.preferences.FilePreferences;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
@@ -27,12 +27,6 @@ public class FieldCheckers {
     private static Multimap<Field, ValueChecker> getAllMap(BibDatabaseContext databaseContext, FilePreferences filePreferences, JournalAbbreviationRepository abbreviationRepository, boolean allowIntegerEdition) {
         ArrayListMultimap<Field, ValueChecker> fieldCheckers = ArrayListMultimap.create(50, 10);
 
-        for (Field field : FieldFactory.getJournalNameFields()) {
-            fieldCheckers.put(field, new AbbreviationChecker(abbreviationRepository));
-        }
-        for (Field field : FieldFactory.getBookNameFields()) {
-            fieldCheckers.put(field, new AbbreviationChecker(abbreviationRepository));
-        }
         for (Field field : FieldFactory.getPersonNameFields()) {
             fieldCheckers.put(field, new PersonNamesChecker(databaseContext));
         }

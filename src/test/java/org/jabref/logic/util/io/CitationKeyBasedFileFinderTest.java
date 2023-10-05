@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 class CitationKeyBasedFileFinderTest {
 
@@ -28,7 +29,7 @@ class CitationKeyBasedFileFinderTest {
     @BeforeEach
     void setUp(@TempDir Path temporaryFolder) throws IOException {
         entry = new BibEntry(StandardEntryType.Article);
-        entry.setCiteKey("HipKro03");
+        entry.setCitationKey("HipKro03");
 
         rootDir = temporaryFolder;
 
@@ -98,5 +99,31 @@ class CitationKeyBasedFileFinderTest {
         List<Path> results = fileFinder.findAssociatedFiles(entry, dirs, extensions);
 
         assertEquals(Collections.emptyList(), results);
+    }
+
+    @Test
+    void findAssociatedFilesWithUnsafeCharactersStartWithSearch() throws Exception {
+        BibEntry entryWithUnsafeCitationKey = new BibEntry(StandardEntryType.Article);
+        entryWithUnsafeCitationKey.setCitationKey("?test");
+
+        Path testFile = Files.createFile(pdfsDir.resolve("_test_file.pdf"));
+        FileFinder fileFinder = new CitationKeyBasedFileFinder(false);
+
+        List<Path> results = fileFinder.findAssociatedFiles(entryWithUnsafeCitationKey, Collections.singletonList(pdfsDir), Collections.singletonList("pdf"));
+
+        assertEquals(Collections.singletonList(testFile), results);
+    }
+
+    @Test
+    void findAssociatedFilesWithUnsafeCharactersExactSearch() throws Exception {
+        BibEntry entryWithUnsafeCitationKey = new BibEntry(StandardEntryType.Article);
+        entryWithUnsafeCitationKey.setCitationKey("test:test/*test?");
+
+        Path testFile = Files.createFile(pdfsDir.resolve("test_test__test_.pdf"));
+        FileFinder fileFinder = new CitationKeyBasedFileFinder(true);
+
+        List<Path> results = fileFinder.findAssociatedFiles(entryWithUnsafeCitationKey, Collections.singletonList(pdfsDir), Collections.singletonList("pdf"));
+
+        assertNotEquals(Collections.singletonList(testFile), results);
     }
 }

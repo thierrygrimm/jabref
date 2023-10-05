@@ -4,10 +4,10 @@ import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
-import org.jabref.JabRefException;
-import org.jabref.JabRefExecutorService;
-import org.jabref.gui.icon.IconTheme;
+import org.jabref.gui.JabRefExecutorService;
+import org.jabref.gui.theme.ThemeManager;
 import org.jabref.gui.util.DefaultFileUpdateMonitor;
+import org.jabref.logic.JabRefException;
 import org.jabref.preferences.JabRefPreferences;
 
 /**
@@ -22,15 +22,15 @@ public class StyleTesterMain extends Application {
     @Override
     public void start(Stage stage) throws JabRefException {
         StyleTesterView view = new StyleTesterView();
-        JabRefPreferences preferences = JabRefPreferences.getInstance();
-
-        IconTheme.loadFonts();
-
         DefaultFileUpdateMonitor fileUpdateMonitor = new DefaultFileUpdateMonitor();
         JabRefExecutorService.INSTANCE.executeInterruptableTask(fileUpdateMonitor, "FileUpdateMonitor");
+        ThemeManager themeManager = new ThemeManager(
+                JabRefPreferences.getInstance().getAppearancePreferences(),
+                fileUpdateMonitor,
+                Runnable::run);
 
         Scene scene = new Scene(view.getContent());
-        preferences.getTheme().installCss(scene, fileUpdateMonitor);
+        themeManager.installCss(scene);
         stage.setScene(scene);
         stage.show();
     }

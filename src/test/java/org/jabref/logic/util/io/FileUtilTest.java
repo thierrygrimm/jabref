@@ -20,15 +20,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Answers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 class FileUtilTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileUtilTest.class);
+
     private final Path nonExistingTestPath = Path.of("nonExistingTestPath");
     private Path existingTestFile;
     private Path otherExistingTestFile;
@@ -65,10 +68,9 @@ class FileUtilTest {
 
     @Test
     void testGetLinkedFileNameDefaultFullTitle() {
-        // bibkey - title
-        String fileNamePattern = "[bibtexkey] - [fulltitle]";
+        String fileNamePattern = "[citationkey] - [fulltitle]";
         BibEntry entry = new BibEntry();
-        entry.setCiteKey("1234");
+        entry.setCitationKey("1234");
         entry.setField(StandardField.TITLE, "mytitle");
 
         assertEquals("1234 - mytitle",
@@ -77,10 +79,9 @@ class FileUtilTest {
 
     @Test
     void testGetLinkedFileNameDefaultWithLowercaseTitle() {
-        // bibkey - title
-        String fileNamePattern = "[bibtexkey] - [title:lower]";
+        String fileNamePattern = "[citationkey] - [title:lower]";
         BibEntry entry = new BibEntry();
-        entry.setCiteKey("1234");
+        entry.setCitationKey("1234");
         entry.setField(StandardField.TITLE, "mytitle");
 
         assertEquals("1234 - mytitle",
@@ -89,10 +90,9 @@ class FileUtilTest {
 
     @Test
     void testGetLinkedFileNameBibTeXKey() {
-        // bibkey
-        String fileNamePattern = "[bibtexkey]";
+        String fileNamePattern = "[citationkey]";
         BibEntry entry = new BibEntry();
-        entry.setCiteKey("1234");
+        entry.setCitationKey("1234");
         entry.setField(StandardField.TITLE, "mytitle");
 
         assertEquals("1234",
@@ -103,7 +103,7 @@ class FileUtilTest {
     void testGetLinkedFileNameNoPattern() {
         String fileNamePattern = "";
         BibEntry entry = new BibEntry();
-        entry.setCiteKey("1234");
+        entry.setCitationKey("1234");
         entry.setField(StandardField.TITLE, "mytitle");
 
         assertEquals("1234", FileUtil.createFileNameFromPattern(null, entry, fileNamePattern));
@@ -120,17 +120,15 @@ class FileUtilTest {
 
     @Test
     void testGetLinkedFileNameGetKeyIfEmptyField() {
-        // bibkey - title
         String fileNamePattern = "[title]";
         BibEntry entry = new BibEntry();
-        entry.setCiteKey("1234");
+        entry.setCitationKey("1234");
 
         assertEquals("1234", FileUtil.createFileNameFromPattern(null, entry, fileNamePattern));
     }
 
     @Test
     void testGetLinkedFileNameGetDefaultIfEmptyFieldNoKey() {
-        // bibkey - title
         String fileNamePattern = "[title]";
         BibEntry entry = new BibEntry();
 
@@ -139,7 +137,6 @@ class FileUtilTest {
 
     @Test
     void testGetLinkedFileNameByYearAuthorFirstpage() {
-        // bibkey - title
         String fileNamePattern = "[year]_[auth]_[firstpage]";
         BibEntry entry = new BibEntry();
         entry.setField(StandardField.AUTHOR, "O. Kitsune");
@@ -280,57 +277,6 @@ class FileUtilTest {
     }
 
     @Test
-    void testRenameFileWithFromFileIsNullAndToFileIsNull() {
-        assertThrows(NullPointerException.class, () -> FileUtil.renameFile(null, null));
-    }
-
-    @Test
-    void testRenameFileWithFromFileExistAndToFileIsNull() {
-        assertThrows(NullPointerException.class, () -> FileUtil.renameFile(existingTestFile, null));
-    }
-
-    @Test
-    void testRenameFileWithFromFileIsNullAndToFileExist() {
-        assertThrows(NullPointerException.class, () -> FileUtil.renameFile(null, existingTestFile));
-    }
-
-    @Test
-    void testRenameFileWithFromFileNotExistAndToFileNotExist() {
-        assertFalse(FileUtil.renameFile(nonExistingTestPath, nonExistingTestPath));
-    }
-
-    @Test
-    void testRenameFileWithFromFileNotExistAndToFileExist() {
-        assertFalse(FileUtil.renameFile(nonExistingTestPath, existingTestFile));
-    }
-
-    @Test
-    void testRenameFileWithFromFileExistAndToFileNotExist() {
-        assertTrue(FileUtil.renameFile(existingTestFile, nonExistingTestPath));
-    }
-
-    @Test
-    void testRenameFileWithFromFileExistAndToFileExist() {
-        assertTrue(FileUtil.renameFile(existingTestFile, existingTestFile));
-    }
-
-    @Test
-    void testRenameFileWithFromFileExistAndOtherToFileExist() {
-        assertFalse(FileUtil.renameFile(existingTestFile, otherExistingTestFile));
-    }
-
-    @Test
-    void testRenameFileSuccessful(@TempDir Path otherTemporaryFolder) {
-        // Be careful. This "otherTemporaryFolder" is the same as the "temporaryFolder"
-        // in the @BeforeEach method.
-        Path temp = Path.of(otherTemporaryFolder.resolve("123").toString());
-
-        System.out.println(temp);
-        FileUtil.renameFile(existingTestFile, temp);
-        assertFalse(Files.exists(existingTestFile));
-    }
-
-    @Test
     void validFilenameShouldNotAlterValidFilename() {
         assertEquals("somename.pdf", FileUtil.getValidFileName("somename.pdf"));
     }
@@ -356,10 +302,9 @@ class FileUtilTest {
 
     @Test
     void testGetLinkedDirNameDefaultFullTitle() {
-        // bibkey - title
-        String fileDirPattern = "PDF/[year]/[auth]/[bibtexkey] - [fulltitle]";
+        String fileDirPattern = "PDF/[year]/[auth]/[citationkey] - [fulltitle]";
         BibEntry entry = new BibEntry();
-        entry.setCiteKey("1234");
+        entry.setCitationKey("1234");
         entry.setField(StandardField.TITLE, "mytitle");
         entry.setField(StandardField.YEAR, "1998");
         entry.setField(StandardField.AUTHOR, "A. Åuthör and Author, Bete");
@@ -370,7 +315,7 @@ class FileUtilTest {
     @Test
     void testGetLinkedDirNamePatternEmpty() {
         BibEntry entry = new BibEntry();
-        entry.setCiteKey("1234");
+        entry.setCitationKey("1234");
         entry.setField(StandardField.TITLE, "mytitle");
         entry.setField(StandardField.YEAR, "1998");
         entry.setField(StandardField.AUTHOR, "A. Åuthör and Author, Bete");
@@ -379,15 +324,29 @@ class FileUtilTest {
     }
 
     @Test
-    public void testIsBibFile() throws IOException {
+    void testIsBibFile() throws IOException {
         Path bibFile = Files.createFile(rootDir.resolve("test.bib"));
 
         assertTrue(FileUtil.isBibFile(bibFile));
     }
 
     @Test
-    public void testIsNotBibFile() throws IOException {
+    void testIsNotBibFile() throws IOException {
         Path bibFile = Files.createFile(rootDir.resolve("test.pdf"));
         assertFalse(FileUtil.isBibFile(bibFile));
+    }
+
+    @Test
+    void testFindinPath() {
+        Optional<Path> resultPath1 = FileUtil.find("existingTestFile.txt", rootDir);
+        assertEquals(resultPath1.get().toString(), existingTestFile.toString());
+    }
+
+    @Test
+    void testFindInListOfPath() {
+        List<Path> paths = List.of(existingTestFile, otherExistingTestFile, rootDir);
+        List<Path> resultPaths = List.of(existingTestFile, existingTestFile);
+        List<Path> result = FileUtil.find("existingTestFile.txt", paths);
+        assertEquals(resultPaths, result);
     }
 }

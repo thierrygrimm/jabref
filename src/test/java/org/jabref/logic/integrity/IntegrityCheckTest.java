@@ -11,8 +11,8 @@ import java.util.stream.Stream;
 
 import org.jabref.logic.citationkeypattern.CitationKeyGenerator;
 import org.jabref.logic.citationkeypattern.CitationKeyPatternPreferences;
+import org.jabref.logic.citationkeypattern.GlobalCitationKeyPattern;
 import org.jabref.logic.journals.JournalAbbreviationLoader;
-import org.jabref.model.bibtexkeypattern.GlobalCitationKeyPattern;
 import org.jabref.model.database.BibDatabase;
 import org.jabref.model.database.BibDatabaseContext;
 import org.jabref.model.database.BibDatabaseMode;
@@ -23,8 +23,8 @@ import org.jabref.model.entry.field.StandardField;
 import org.jabref.model.entry.types.EntryType;
 import org.jabref.model.entry.types.IEEETranEntryType;
 import org.jabref.model.entry.types.StandardEntryType;
-import org.jabref.model.metadata.FilePreferences;
 import org.jabref.model.metadata.MetaData;
+import org.jabref.preferences.FilePreferences;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -87,9 +87,9 @@ class IntegrityCheckTest {
 
     private static Stream<String> provideIncorrectFormat() {
         return Stream.of("   Knuth, Donald E. ",
-                         "Knuth, Donald E. and Kurt Cobain and A. Einstein",
-                         ", and Kurt Cobain and A. Einstein", "Donald E. Knuth and Kurt Cobain and ,",
-                         "and Kurt Cobain and A. Einstein", "Donald E. Knuth and Kurt Cobain and");
+                "Knuth, Donald E. and Kurt Cobain and A. Einstein",
+                ", and Kurt Cobain and A. Einstein", "Donald E. Knuth and Kurt Cobain and ,",
+                "and Kurt Cobain and A. Einstein", "Donald E. Knuth and Kurt Cobain and");
     }
 
     @Test
@@ -179,7 +179,7 @@ class IntegrityCheckTest {
 
     private void assertCorrect(BibDatabaseContext context) {
         FilePreferences filePreferencesMock = mock(FilePreferences.class);
-        when(filePreferencesMock.isBibLocationAsPrimary()).thenReturn(true);
+        when(filePreferencesMock.shouldStoreFilesRelativeToBibFile()).thenReturn(true);
         List<IntegrityMessage> messages = new IntegrityCheck(context,
                 filePreferencesMock,
                 createCitationKeyPatternPreferences(),
@@ -188,17 +188,7 @@ class IntegrityCheckTest {
         assertEquals(Collections.emptyList(), messages);
     }
 
-    private void assertCorrect(BibDatabaseContext context, boolean allowIntegerEdition) {
-        List<IntegrityMessage> messages = new IntegrityCheck(context,
-                                                             mock(FilePreferences.class),
-                                                             createCitationKeyPatternPreferences(),
-                                                             JournalAbbreviationLoader.loadBuiltInRepository(),
-                                                             allowIntegerEdition).check();
-        assertEquals(Collections.emptyList(), messages);
-    }
-
     private CitationKeyPatternPreferences createCitationKeyPatternPreferences() {
-        final GlobalCitationKeyPattern keyPattern = GlobalCitationKeyPattern.fromPattern("[auth][year]");
         return new CitationKeyPatternPreferences(
                 false,
                 false,
@@ -207,7 +197,8 @@ class IntegrityCheckTest {
                 "",
                 "",
                 CitationKeyGenerator.DEFAULT_UNWANTED_CHARACTERS,
-                keyPattern,
+                GlobalCitationKeyPattern.fromPattern("[auth][year]"),
+                "",
                 ',');
     }
 

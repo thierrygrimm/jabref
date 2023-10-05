@@ -3,6 +3,7 @@ package org.jabref.logic.importer.fetcher;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
 import org.jabref.logic.importer.ImportCleanup;
@@ -21,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Defines the set of capability tests that each tests a given search capability, e.g. author based search.
  * The idea is to code the capabilities of a fetcher into Java code.
- * This way, a) the capbilities of a fetcher are checked automatically (because they can change from time-to-time by the provider)
+ * This way, a) the capabilities of a fetcher are checked automatically (because they can change from time-to-time by the provider)
  * and b) the queries sent to the fetchers can be debugged directly without a route through to some fetcher code.
  */
 interface SearchBasedFetcherCapabilityTest {
@@ -31,10 +32,10 @@ interface SearchBasedFetcherCapabilityTest {
      */
     @Test
     default void supportsAuthorSearch() throws Exception {
-        ComplexSearchQuery.ComplexSearchQueryBuilder builder = ComplexSearchQuery.builder();
-        getTestAuthors().forEach(builder::author);
+        StringJoiner queryBuilder = new StringJoiner("\" AND author:\"", "author:\"", "\"");
+        getTestAuthors().forEach(queryBuilder::add);
 
-        List<BibEntry> result = getFetcher().performComplexSearch(builder.build());
+        List<BibEntry> result = getFetcher().performSearch(queryBuilder.toString());
         new ImportCleanup(BibDatabaseMode.BIBTEX).doPostCleanup(result);
 
         assertFalse(result.isEmpty());
@@ -51,12 +52,7 @@ interface SearchBasedFetcherCapabilityTest {
      */
     @Test
     default void supportsYearSearch() throws Exception {
-        ComplexSearchQuery complexSearchQuery = ComplexSearchQuery
-                .builder()
-                .singleYear(getTestYear())
-                .build();
-
-        List<BibEntry> result = getFetcher().performComplexSearch(complexSearchQuery);
+        List<BibEntry> result = getFetcher().performSearch("year:" + getTestYear());
         new ImportCleanup(BibDatabaseMode.BIBTEX).doPostCleanup(result);
         List<String> differentYearsInResult = result.stream()
                                                     .map(bibEntry -> bibEntry.getField(StandardField.YEAR))
@@ -73,11 +69,9 @@ interface SearchBasedFetcherCapabilityTest {
      */
     @Test
     default void supportsYearRangeSearch() throws Exception {
-        ComplexSearchQuery.ComplexSearchQueryBuilder builder = ComplexSearchQuery.builder();
         List<String> yearsInYearRange = List.of("2018", "2019", "2020");
-        builder.fromYearAndToYear(2018, 2020);
 
-        List<BibEntry> result = getFetcher().performComplexSearch(builder.build());
+        List<BibEntry> result = getFetcher().performSearch("year-range:2018-2020");
         new ImportCleanup(BibDatabaseMode.BIBTEX).doPostCleanup(result);
         List<String> differentYearsInResult = result.stream()
                                                     .map(bibEntry -> bibEntry.getField(StandardField.YEAR))
@@ -91,16 +85,18 @@ interface SearchBasedFetcherCapabilityTest {
 
     /**
      * Test whether the library API supports journal based search.
+     *
+     * WARNING: the error while merging information from user-assigned DOI (more specifically, "10.1016/j.geomphys.2012.09.009")
+     * is related to a failed read by the Bibtex Parser (title is formatted in a weird way)
      */
     @Test
     default void supportsJournalSearch() throws Exception {
-        ComplexSearchQuery.ComplexSearchQueryBuilder builder = ComplexSearchQuery.builder();
-        builder.journal(getTestJournal());
-        List<BibEntry> result = getFetcher().performComplexSearch(builder.build());
+        List<BibEntry> result = getFetcher().performSearch("journal:\"" + getTestJournal() + "\"");
         new ImportCleanup(BibDatabaseMode.BIBTEX).doPostCleanup(result);
 
         assertFalse(result.isEmpty());
         result.forEach(bibEntry -> {
+            assertTrue(bibEntry.hasField(StandardField.JOURNAL));
             String journal = bibEntry.getField(StandardField.JOURNAL).orElse("");
             assertTrue(journal.contains(getTestJournal().replace("\"", "")));
         });

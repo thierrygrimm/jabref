@@ -9,16 +9,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBElement;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
 
 import org.jabref.logic.importer.ImportFormatPreferences;
 import org.jabref.logic.importer.Importer;
@@ -63,6 +59,10 @@ import org.jabref.model.entry.field.UnknownField;
 import org.jabref.model.entry.types.EntryTypeFactory;
 
 import com.google.common.base.Joiner;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBElement;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Unmarshaller;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,7 +81,7 @@ public class ModsImporter extends Importer implements Parser {
     private JAXBContext context;
 
     public ModsImporter(ImportFormatPreferences importFormatPreferences) {
-        keywordSeparator = importFormatPreferences.getKeywordSeparator() + " ";
+        keywordSeparator = importFormatPreferences.bibEntryPreferences().getKeywordSeparator() + " ";
     }
 
     @Override
@@ -134,7 +134,7 @@ public class ModsImporter extends Importer implements Parser {
         BibEntry entry = new BibEntry();
         Map<Field, String> fields = new HashMap<>();
         if (modsDefinition.getID() != null) {
-            entry.setCiteKey(modsDefinition.getID());
+            entry.setCitationKey(modsDefinition.getID());
         }
         if (modsDefinition.getModsGroup() != null) {
             parseModsGroup(fields, modsDefinition.getModsGroup(), entry);
@@ -149,7 +149,6 @@ public class ModsImporter extends Importer implements Parser {
         List<String> notes = new ArrayList<>();
 
         for (Object groupElement : modsGroup) {
-
             // Get the element. Only one of the elements should be not an empty optional.
             Optional<AbstractDefinition> abstractDefinition = getElement(groupElement, AbstractDefinition.class);
             Optional<GenreDefinition> genreDefinition = getElement(groupElement, GenreDefinition.class);
@@ -169,7 +168,7 @@ public class ModsImporter extends Importer implements Parser {
             abstractDefinition
                     .ifPresent(abstractDef -> putIfValueNotNull(fields, StandardField.ABSTRACT, abstractDef.getValue()));
 
-            genreDefinition.ifPresent(genre -> entry.setType(EntryTypeFactory.parse(genre.getValue())));
+            genreDefinition.ifPresent(genre -> entry.setType(EntryTypeFactory.parse(mapGenre(genre.getValue()))));
 
             languageDefinition.ifPresent(
                     languageDef -> languageDef.getLanguageTerm().stream().map(LanguageTermDefinition::getValue)
@@ -180,7 +179,7 @@ public class ModsImporter extends Importer implements Parser {
             nameDefinition.ifPresent(name -> handleAuthorsInNamePart(name, authors, fields));
 
             originInfoDefinition.ifPresent(originInfo -> originInfo
-                    .getPlaceOrPublisherOrDateIssued().stream()
+                    .getPlaceOrPublisherOrDateIssued()
                     .forEach(element -> putPlaceOrPublisherOrDate(fields, element.getName().getLocalPart(),
                             element.getValue())));
 
@@ -196,7 +195,6 @@ public class ModsImporter extends Importer implements Parser {
             identifierDefinition.ifPresent(identifier -> parseIdentifier(fields, identifier, entry));
 
             titleInfoDefinition.ifPresent(titleInfo -> parseTitle(fields, titleInfo.getTitleOrSubTitleOrPartNumber()));
-
         }
 
         // The element subject can appear more than one time, that's why the keywords has to be put out of the for loop
@@ -204,7 +202,16 @@ public class ModsImporter extends Importer implements Parser {
         // same goes for authors and notes
         putIfListIsNotEmpty(fields, authors, StandardField.AUTHOR, " and ");
         putIfListIsNotEmpty(fields, notes, StandardField.NOTE, ", ");
+    }
 
+    private String mapGenre(String genre) {
+        return switch (genre.toLowerCase(Locale.ROOT)) {
+            case "conference publication" -> "proceedings";
+            case "database" -> "dataset";
+            case "yearbook", "handbook" -> "book";
+            case "law report or digest", "technical report", "reporting" -> "report";
+            default -> genre;
+        };
     }
 
     private void parseTitle(Map<Field, String> fields, List<Object> titleOrSubTitleOrPartNumber) {
@@ -222,8 +229,8 @@ public class ModsImporter extends Importer implements Parser {
 
     private void parseIdentifier(Map<Field, String> fields, IdentifierDefinition identifier, BibEntry entry) {
         String type = identifier.getType();
-        if ("citekey".equals(type) && !entry.getCiteKeyOptional().isPresent()) {
-            entry.setCiteKey(identifier.getValue());
+        if ("citekey".equals(type) && entry.getCitationKey().isEmpty()) {
+            entry.setCitationKey(identifier.getValue());
         } else if (!"local".equals(type) && !"citekey".equals(type)) {
             // put all identifiers (doi, issn, isbn,...) except of local and citekey
             putIfValueNotNull(fields, FieldFactory.parseField(identifier.getType()), identifier.getValue());
@@ -374,8 +381,8 @@ public class ModsImporter extends Importer implements Parser {
 
         List<String> places = new ArrayList<>();
         placeDefinition
-                .ifPresent(place -> place.getPlaceTerm().stream().filter(placeTerm -> placeTerm.getValue() != null)
-                                         .map(PlaceTermDefinition::getValue).forEach(element -> places.add(element)));
+                .ifPresent(place -> place.getPlaceTerm().stream().map(PlaceTermDefinition::getValue)
+                                         .filter(Objects::nonNull).forEach(places::add));
         putIfListIsNotEmpty(fields, places, StandardField.ADDRESS, ", ");
 
         dateDefinition.ifPresent(date -> putDate(fields, elementName, date));
@@ -395,7 +402,6 @@ public class ModsImporter extends Importer implements Parser {
     private void putDate(Map<Field, String> fields, String elementName, DateDefinition date) {
         if (date.getValue() != null) {
             switch (elementName) {
-
                 case "dateIssued":
                     // The first 4 digits of dateIssued should be the year
                     fields.put(StandardField.YEAR, date.getValue().replaceAll("[^0-9]*", "").replaceAll("\\(\\d?\\d?\\d?\\d?.*\\)", "\1"));

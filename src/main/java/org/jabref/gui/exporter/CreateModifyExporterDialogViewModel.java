@@ -56,36 +56,30 @@ public class CreateModifyExporterDialogViewModel extends AbstractViewModel {
     public ExporterViewModel saveExporter() {
         Path layoutFileDir = Path.of(layoutFile.get()).getParent();
         if (layoutFileDir != null) {
-            String layoutFileDirString = layoutFileDir.toString();
-            preferences.setExportWorkingDirectory(layoutFileDirString);
+            preferences.getImportExportPreferences().setExportWorkingDirectory(layoutFileDir);
         }
 
         // Check that there are no empty strings.
         if (layoutFile.get().isEmpty() || name.get().isEmpty() || extension.get().isEmpty()
                 || !layoutFile.get().endsWith(".layout")) {
-
             LOGGER.info("One of the fields is empty or invalid!");
             return null;
         }
 
         // Create a new exporter to be returned to ExportCustomizationDialogViewModel, which requested it
         LayoutFormatterPreferences layoutPreferences = preferences.getLayoutFormatterPreferences(repository);
-        SavePreferences savePreferences = preferences.loadForExportFromPreferences();
+        SavePreferences savePreferences = preferences.getSavePreferencesForExport();
         TemplateExporter format = new TemplateExporter(name.get(), layoutFile.get(), extension.get(),
                 layoutPreferences, savePreferences);
         format.setCustomExport(true);
         return new ExporterViewModel(format);
     }
 
-    public String getExportWorkingDirectory() {
-        return preferences.getExportWorkingDirectory();
-    }
-
     public void browse() {
         FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()
                 .addExtensionFilter(Localization.lang("Custom layout file"), StandardFileType.LAYOUT)
                 .withDefaultExtension(Localization.lang("Custom layout file"), StandardFileType.LAYOUT)
-                .withInitialDirectory(getExportWorkingDirectory()).build();
+                .withInitialDirectory(preferences.getImportExportPreferences().getExportWorkingDirectory()).build();
         dialogService.showFileOpenDialog(fileDialogConfiguration).ifPresent(f -> layoutFile.set(f.toAbsolutePath().toString()));
     }
 

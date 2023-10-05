@@ -13,13 +13,14 @@ import javafx.scene.input.KeyEvent;
 
 import org.jabref.gui.icon.IconTheme;
 import org.jabref.gui.util.ValueTableCellFactory;
+import org.jabref.logic.citationkeypattern.AbstractCitationKeyPattern;
 import org.jabref.logic.l10n.Localization;
-import org.jabref.model.bibtexkeypattern.AbstractCitationKeyPattern;
 import org.jabref.model.entry.BibEntryType;
 import org.jabref.model.entry.types.EntryType;
-import org.jabref.preferences.JabRefPreferences;
+import org.jabref.preferences.PreferencesService;
 
 import com.airhacks.afterburner.views.ViewLoader;
+import jakarta.inject.Inject;
 
 public class CitationKeyPatternPanel extends TableView<CitationKeyPatternPanelItemModel> {
 
@@ -27,15 +28,15 @@ public class CitationKeyPatternPanel extends TableView<CitationKeyPatternPanelIt
     @FXML public TableColumn<CitationKeyPatternPanelItemModel, String> patternColumn;
     @FXML public TableColumn<CitationKeyPatternPanelItemModel, EntryType> actionsColumn;
 
+    @Inject private PreferencesService preferences;
+
     private CitationKeyPatternPanelViewModel viewModel;
 
     private long lastKeyPressTime;
     private String tableSearchTerm;
 
-    public CitationKeyPatternPanel(JabRefPreferences preferences, Collection<BibEntryType> entryTypeList, AbstractCitationKeyPattern keyPattern) {
+    public CitationKeyPatternPanel() {
         super();
-
-        viewModel = new CitationKeyPatternPanelViewModel(preferences, entryTypeList, keyPattern);
 
         ViewLoader.view(this)
                   .root(this)
@@ -44,6 +45,8 @@ public class CitationKeyPatternPanel extends TableView<CitationKeyPatternPanelIt
 
     @FXML
     private void initialize() {
+        viewModel = new CitationKeyPatternPanelViewModel(preferences.getCitationKeyPatternPreferences());
+
         this.setEditable(true);
 
         entryTypeColumn.setSortable(true);
@@ -80,8 +83,8 @@ public class CitationKeyPatternPanel extends TableView<CitationKeyPatternPanelIt
         this.itemsProperty().bindBidirectional(viewModel.patternListProperty());
     }
 
-    public void setValues() {
-        viewModel.setValues();
+    public void setValues(Collection<BibEntryType> entryTypeList, AbstractCitationKeyPattern keyPattern) {
+        viewModel.setValues(entryTypeList, keyPattern);
     }
 
     public void resetAll() {

@@ -1,9 +1,7 @@
 # no generated files in version control
 src/main/gen/
 src/main/generated/
-
-# the journal list cache
-*.mv
+src-gen/
 
 # private data
 /buildres/jabref-cert-2016.p12

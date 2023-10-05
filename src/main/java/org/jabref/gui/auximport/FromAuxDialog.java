@@ -2,8 +2,6 @@ package org.jabref.gui.auximport;
 
 import java.nio.file.Path;
 
-import javax.inject.Inject;
-
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -11,28 +9,30 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 
-import org.jabref.gui.BasePanel;
 import org.jabref.gui.DialogService;
 import org.jabref.gui.JabRefFrame;
+import org.jabref.gui.LibraryTab;
+import org.jabref.gui.theme.ThemeManager;
 import org.jabref.gui.util.BaseDialog;
 import org.jabref.gui.util.FileDialogConfiguration;
+import org.jabref.logic.auxparser.AuxParser;
+import org.jabref.logic.auxparser.AuxParserResult;
 import org.jabref.logic.auxparser.DefaultAuxParser;
 import org.jabref.logic.l10n.Localization;
 import org.jabref.logic.util.StandardFileType;
-import org.jabref.model.auxparser.AuxParser;
-import org.jabref.model.auxparser.AuxParserResult;
 import org.jabref.model.database.BibDatabase;
 import org.jabref.model.database.BibDatabaseContext;
 import org.jabref.preferences.PreferencesService;
 
 import com.airhacks.afterburner.views.ViewLoader;
+import jakarta.inject.Inject;
 
 /**
  * A wizard dialog for generating a new sub database from existing TeX AUX file
  */
 public class FromAuxDialog extends BaseDialog<Void> {
 
-    private final BasePanel basePanel;
+    private final LibraryTab libraryTab;
     @FXML private ButtonType generateButtonType;
     private final Button generateButton;
     @FXML private TextField auxFileField;
@@ -42,9 +42,10 @@ public class FromAuxDialog extends BaseDialog<Void> {
 
     @Inject private PreferencesService preferences;
     @Inject private DialogService dialogService;
+    @Inject private ThemeManager themeManager;
 
     public FromAuxDialog(JabRefFrame frame) {
-        basePanel = frame.getCurrentBasePanel();
+        libraryTab = frame.getCurrentLibraryTab();
         this.setTitle(Localization.lang("AUX file import"));
 
         ViewLoader.view(this)
@@ -61,13 +62,15 @@ public class FromAuxDialog extends BaseDialog<Void> {
             }
             return null;
         });
+
+        themeManager.updateFontStyle(getDialogPane().getScene());
     }
 
     @FXML
     private void parseActionPerformed() {
         notFoundList.getItems().clear();
         statusInfos.setText("");
-        BibDatabase refBase = basePanel.getDatabase();
+        BibDatabase refBase = libraryTab.getDatabase();
         String auxName = auxFileField.getText();
 
         if ((auxName != null) && (refBase != null) && !auxName.isEmpty()) {
@@ -91,9 +94,9 @@ public class FromAuxDialog extends BaseDialog<Void> {
     @FXML
     private void browseButtonClicked() {
         FileDialogConfiguration fileDialogConfiguration = new FileDialogConfiguration.Builder()
-                                                                                               .addExtensionFilter(StandardFileType.AUX)
-                                                                                               .withDefaultExtension(StandardFileType.AUX)
-                                                                                               .withInitialDirectory(preferences.getWorkingDir()).build();
+                .addExtensionFilter(StandardFileType.AUX)
+                .withDefaultExtension(StandardFileType.AUX)
+                .withInitialDirectory(preferences.getFilePreferences().getWorkingDirectory()).build();
         dialogService.showFileOpenDialog(fileDialogConfiguration).ifPresent(file -> auxFileField.setText(file.toAbsolutePath().toString()));
     }
 }

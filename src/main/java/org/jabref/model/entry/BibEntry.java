@@ -3,6 +3,7 @@ package org.jabref.model.entry;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -10,9 +11,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javafx.beans.Observable;
 import javafx.beans.property.ObjectProperty;
@@ -20,6 +22,9 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableMap;
 
+import org.jabref.architecture.AllowedToUseLogic;
+import org.jabref.logic.bibtex.FileFieldWriter;
+import org.jabref.logic.importer.util.FileFieldParser;
 import org.jabref.model.FieldChange;
 import org.jabref.model.database.BibDatabase;
 import org.jabref.model.entry.event.EntriesEventSource;
@@ -30,6 +35,7 @@ import org.jabref.model.entry.field.InternalField;
 import org.jabref.model.entry.field.OrFields;
 import org.jabref.model.entry.field.StandardField;
 import org.jabref.model.entry.identifier.DOI;
+import org.jabref.model.entry.identifier.ISBN;
 import org.jabref.model.entry.types.EntryType;
 import org.jabref.model.entry.types.IEEETranEntryType;
 import org.jabref.model.entry.types.StandardEntryType;
@@ -37,7 +43,6 @@ import org.jabref.model.strings.LatexToUnicodeAdapter;
 import org.jabref.model.strings.StringUtil;
 import org.jabref.model.util.MultiKeyMap;
 
-import com.google.common.base.Strings;
 import com.google.common.eventbus.EventBus;
 import com.tobiasdiez.easybind.EasyBind;
 import com.tobiasdiez.easybind.optional.OptionalBinding;
@@ -47,13 +52,13 @@ import org.slf4j.LoggerFactory;
 /**
  * Represents a BibTex / BibLaTeX entry.
  * <p>
- * In case you search for a builder as described in Item 2 of the book "Effective Java", you won't find one. Please use the methods {@link #withCiteKey(String)} and {@link #withField(Field, String)}.
+ * In case you search for a builder as described in Item 2 of the book "Effective Java", you won't find one. Please use the methods {@link #withCitationKey(String)} and {@link #withField(Field, String)}.
  */
+@AllowedToUseLogic("because it needs access to parser and writers")
 public class BibEntry implements Cloneable {
 
     public static final EntryType DEFAULT_TYPE = StandardEntryType.Misc;
     private static final Logger LOGGER = LoggerFactory.getLogger(BibEntry.class);
-    private static final Pattern REMOVE_TRAILING_WHITESPACE = Pattern.compile("\\s+$");
     private final SharedBibEntryData sharedBibEntryData;
 
     /**
@@ -137,11 +142,11 @@ public class BibEntry implements Cloneable {
     private Optional<Field> getSourceField(Field targetField, EntryType targetEntry, EntryType sourceEntry) {
         //// 1. Sort out forbidden fields
         if ((targetField == StandardField.IDS) ||
-            (targetField == StandardField.CROSSREF) ||
-            (targetField == StandardField.XREF) ||
-            (targetField == StandardField.ENTRYSET) ||
-            (targetField == StandardField.RELATED) ||
-            (targetField == StandardField.SORTKEY)) {
+                (targetField == StandardField.CROSSREF) ||
+                (targetField == StandardField.XREF) ||
+                (targetField == StandardField.ENTRYSET) ||
+                (targetField == StandardField.RELATED) ||
+                (targetField == StandardField.SORTKEY)) {
             return Optional.empty();
         }
 
@@ -183,8 +188,8 @@ public class BibEntry implements Cloneable {
 
             // those fields are no more available for the same-name inheritance strategy
             if ((targetField == StandardField.TITLE) ||
-                (targetField == StandardField.SUBTITLE) ||
-                (targetField == StandardField.TITLEADDON)) {
+                    (targetField == StandardField.SUBTITLE) ||
+                    (targetField == StandardField.TITLEADDON)) {
                 return Optional.empty();
             }
 
@@ -195,12 +200,12 @@ public class BibEntry implements Cloneable {
         }
 
         if (((sourceEntry == StandardEntryType.Book) && (targetEntry == StandardEntryType.InBook)) ||
-            ((sourceEntry == StandardEntryType.Book) && (targetEntry == StandardEntryType.BookInBook)) ||
-            ((sourceEntry == StandardEntryType.Book) && (targetEntry == StandardEntryType.SuppBook)) ||
-            ((sourceEntry == StandardEntryType.Collection) && (targetEntry == StandardEntryType.InCollection)) ||
-            ((sourceEntry == StandardEntryType.Collection) && (targetEntry == StandardEntryType.SuppCollection)) ||
-            ((sourceEntry == StandardEntryType.Reference) && (targetEntry == StandardEntryType.InReference)) ||
-            ((sourceEntry == StandardEntryType.Proceedings) && (targetEntry == StandardEntryType.InProceedings))) {
+                ((sourceEntry == StandardEntryType.Book) && (targetEntry == StandardEntryType.BookInBook)) ||
+                ((sourceEntry == StandardEntryType.Book) && (targetEntry == StandardEntryType.SuppBook)) ||
+                ((sourceEntry == StandardEntryType.Collection) && (targetEntry == StandardEntryType.InCollection)) ||
+                ((sourceEntry == StandardEntryType.Collection) && (targetEntry == StandardEntryType.SuppCollection)) ||
+                ((sourceEntry == StandardEntryType.Reference) && (targetEntry == StandardEntryType.InReference)) ||
+                ((sourceEntry == StandardEntryType.Proceedings) && (targetEntry == StandardEntryType.InProceedings))) {
             if (targetField == StandardField.BOOKTITLE) {
                 return Optional.of(StandardField.TITLE);
             }
@@ -213,8 +218,8 @@ public class BibEntry implements Cloneable {
 
             // those fields are no more available for the same-name inheritance strategy
             if ((targetField == StandardField.TITLE) ||
-                (targetField == StandardField.SUBTITLE) ||
-                (targetField == StandardField.TITLEADDON)) {
+                    (targetField == StandardField.SUBTITLE) ||
+                    (targetField == StandardField.TITLEADDON)) {
                 return Optional.empty();
             }
 
@@ -225,7 +230,7 @@ public class BibEntry implements Cloneable {
         }
 
         if (((sourceEntry == IEEETranEntryType.Periodical) && (targetEntry == StandardEntryType.Article)) ||
-            ((sourceEntry == IEEETranEntryType.Periodical) && (targetEntry == StandardEntryType.SuppPeriodical))) {
+                ((sourceEntry == IEEETranEntryType.Periodical) && (targetEntry == StandardEntryType.SuppPeriodical))) {
             if (targetField == StandardField.JOURNALTITLE) {
                 return Optional.of(StandardField.TITLE);
             }
@@ -235,7 +240,7 @@ public class BibEntry implements Cloneable {
 
             // those fields are no more available for the same-name inheritance strategy
             if ((targetField == StandardField.TITLE) ||
-                (targetField == StandardField.SUBTITLE)) {
+                    (targetField == StandardField.SUBTITLE)) {
                 return Optional.empty();
             }
 
@@ -277,7 +282,7 @@ public class BibEntry implements Cloneable {
         }
 
         if (InternalField.KEY_FIELD.equals(field)) {
-            return getCiteKeyOptional();
+            return getCitationKey();
         }
 
         Optional<String> result = getFieldOrAlias.apply(this, field);
@@ -295,7 +300,10 @@ public class BibEntry implements Cloneable {
                 }
             }
         }
-        return result.map(resultText -> BibDatabase.getText(resultText, database));
+
+        return ((database == null) || result.isEmpty()) ?
+                result :
+                Optional.of(database.resolveForStrings(result.get()));
     }
 
     /**
@@ -323,27 +331,32 @@ public class BibEntry implements Cloneable {
     }
 
     /**
-     * Sets the cite key AKA citation key AKA BibTeX key. Note: This is <emph>not</emph> the internal Id of this entry.
+     * Sets the citation key. Note: This is <emph>not</emph> the internal Id of this entry.
      * The internal Id is always present, whereas the citation key might not be present.
      *
-     * @param newCiteKey The cite key to set. Must not be null; use {@link #clearCiteKey()} to remove the cite key.
+     * @param newKey The cite key to set. Must not be null; use {@link #clearCiteKey()} to remove the cite key.
      */
-    public Optional<FieldChange> setCiteKey(String newCiteKey) {
-        return setField(InternalField.KEY_FIELD, newCiteKey);
+    public Optional<FieldChange> setCitationKey(String newKey) {
+        return setField(InternalField.KEY_FIELD, newKey);
     }
 
-    public BibEntry withCiteKey(String newCiteKey) {
-        setCiteKey(newCiteKey);
+    public BibEntry withCitationKey(String newKey) {
+        setCitationKey(newKey);
         this.setChanged(false);
         return this;
     }
 
-    public Optional<String> getCiteKeyOptional() {
-        return Optional.ofNullable(fields.get(InternalField.KEY_FIELD));
+    public Optional<String> getCitationKey() {
+        String key = fields.get(InternalField.KEY_FIELD);
+        if (StringUtil.isBlank(key)) {
+            return Optional.empty();
+        } else {
+            return Optional.of(key);
+        }
     }
 
-    public boolean hasCiteKey() {
-        return this.getField(InternalField.KEY_FIELD).map(key -> !Strings.isNullOrEmpty(key)).orElse(false);
+    public boolean hasCitationKey() {
+        return getCitationKey().isPresent();
     }
 
     /**
@@ -385,7 +398,7 @@ public class BibEntry implements Cloneable {
     }
 
     /**
-     * Returns an set containing the names of all fields that are set for this particular entry.
+     * Returns a set containing the names of all fields that are set for this particular entry.
      *
      * @return a set of existing field names
      */
@@ -459,7 +472,7 @@ public class BibEntry implements Cloneable {
                 }
             } else {
                 // Date field not in valid format
-                LOGGER.debug("Could not parse date " + date.get());
+                LOGGER.debug("Could not parse date {}", date.get());
                 return Optional.empty();
             }
         }
@@ -468,6 +481,10 @@ public class BibEntry implements Cloneable {
 
     public Optional<DOI> getDOI() {
         return getField(StandardField.DOI).flatMap(DOI::parse);
+    }
+
+    public Optional<ISBN> getISBN() {
+        return getField(StandardField.ISBN).flatMap(ISBN::parse);
     }
 
     /**
@@ -530,6 +547,7 @@ public class BibEntry implements Cloneable {
     public Optional<FieldChange> setField(Field field, String value, EntriesEventSource eventSource) {
         Objects.requireNonNull(field, "field name must not be null");
         Objects.requireNonNull(value, "field value must not be null");
+        Objects.requireNonNull(eventSource, "field eventSource must not be null");
 
         if (value.isEmpty()) {
             return clearField(field);
@@ -583,7 +601,7 @@ public class BibEntry implements Cloneable {
      */
     public Optional<FieldChange> clearField(Field field, EntriesEventSource eventSource) {
         Optional<String> oldValue = getField(field);
-        if (!oldValue.isPresent()) {
+        if (oldValue.isEmpty()) {
             return Optional.empty();
         }
 
@@ -619,8 +637,8 @@ public class BibEntry implements Cloneable {
     public Object clone() {
         BibEntry clone = new BibEntry(type.getValue());
         clone.fields = FXCollections.observableMap(new ConcurrentHashMap<>(fields));
-        clone.commentsBeforeEntry = new String(commentsBeforeEntry);
-        clone.parsedSerialization = new String(parsedSerialization);
+        clone.commentsBeforeEntry = commentsBeforeEntry;
+        clone.parsedSerialization = parsedSerialization;
         clone.changed = changed;
         return clone;
     }
@@ -683,8 +701,7 @@ public class BibEntry implements Cloneable {
     }
 
     public void setCommentsBeforeEntry(String parsedComments) {
-        // delete trailing whitespaces (between entry and text)
-        this.commentsBeforeEntry = REMOVE_TRAILING_WHITESPACE.matcher(parsedComments).replaceFirst("");
+        this.commentsBeforeEntry = parsedComments;
     }
 
     public boolean hasChanged() {
@@ -760,11 +777,24 @@ public class BibEntry implements Cloneable {
 
     public Optional<FieldChange> removeKeywords(KeywordList keywordsToRemove, Character keywordDelimiter) {
         KeywordList keywordList = getKeywords(keywordDelimiter);
+
+        // We need to fix "file has changed on disk" for duplicate keywords
+        // The input of the set may contain duplicate keywords (which are present as single keyword in the set)
+        // Even if no "keywordsToRemove" is contained, the method "putKeywords" will return a change, because the duplicate keywords will have been removed
+        int oldSize = keywordList.size();
         keywordList.removeAll(keywordsToRemove);
-        return putKeywords(keywordList, keywordDelimiter);
+        // claim 1: The size of a set is the same, if no element is removed
+        // claim 2: The size of a set is different if an element was removed
+        // With claim 1, we can assume no change if there is no change on the size
+        if (oldSize == keywordList.size()) {
+            return Optional.empty();
+        } else {
+            return putKeywords(keywordList, keywordDelimiter);
+        }
     }
 
-    public Optional<FieldChange> replaceKeywords(KeywordList keywordsToReplace, Keyword newValue,
+    public Optional<FieldChange> replaceKeywords(KeywordList keywordsToReplace,
+                                                 Keyword newValue,
                                                  Character keywordDelimiter) {
         KeywordList keywordList = getKeywords(keywordDelimiter);
         keywordList.replaceAll(keywordsToReplace, newValue);
@@ -818,6 +848,18 @@ public class BibEntry implements Cloneable {
 
     public BibEntry withField(Field field, String value) {
         setField(field, value);
+        this.setChanged(false);
+        return this;
+    }
+
+    public BibEntry withDate(Date date) {
+        setDate(date);
+        this.setChanged(false);
+        return this;
+    }
+
+    public BibEntry withMonth(Month parsedMonth) {
+        setMonth(parsedMonth);
         this.setChanged(false);
         return this;
     }
@@ -888,7 +930,7 @@ public class BibEntry implements Cloneable {
     public Optional<String> getLatexFreeField(Field field) {
         if (InternalField.KEY_FIELD.equals(field)) {
             // the key field should not be converted
-            return getCiteKeyOptional();
+            return getCitationKey();
         } else if (InternalField.TYPE_HEADER.equals(field)) {
             return Optional.of(type.get().getDisplayName());
         } else if (latexFreeFields.containsKey(field)) {
@@ -944,7 +986,7 @@ public class BibEntry implements Cloneable {
 
     public OptionalBinding<String> getFieldBinding(Field field) {
         if ((field == InternalField.TYPE_HEADER) || (field == InternalField.OBSOLETE_TYPE_HEADER)) {
-            return EasyBind.wrapNullable(type).map(EntryType::getDisplayName);
+            return EasyBind.wrapNullable(type).mapOpt(EntryType::getDisplayName);
         }
         return EasyBind.valueAt(fields, field);
     }
@@ -974,5 +1016,74 @@ public class BibEntry implements Cloneable {
      */
     public Observable[] getObservables() {
         return new Observable[] {fields, type};
+    }
+
+    /**
+     * Helper method to add a downloaded file to the entry.
+     * <p>
+     * Use-case: URL is contained in the file, the file is downloaded and should then replace the url.
+     * This method. adds the given path (as file) to the entry and removes the url.
+     *
+     * @param linkToDownloadedFile the link to the file, which was downloaded
+     * @param downloadedFile the path to be added to the entry
+     */
+    public void replaceDownloadedFile(String linkToDownloadedFile, LinkedFile downloadedFile) {
+        List<LinkedFile> linkedFiles = this.getFiles();
+
+        int oldFileIndex = -1;
+        int i = 0;
+        while ((i < linkedFiles.size()) && (oldFileIndex == -1)) {
+            LinkedFile file = linkedFiles.get(i);
+            // The file type changes as part of download process (see prepareDownloadTask), thus we only compare by link
+            if (file.getLink().equalsIgnoreCase(linkToDownloadedFile)) {
+                oldFileIndex = i;
+            }
+            i++;
+        }
+        if (oldFileIndex == -1) {
+            linkedFiles.add(0, downloadedFile);
+        } else {
+            linkedFiles.set(oldFileIndex, downloadedFile);
+        }
+
+        this.setFiles(linkedFiles);
+    }
+
+    /**
+     * Merge this entry's fields with another BibEntry. Non-intersecting fields will be automatically merged. In cases of
+     * intersection, priority is given to THIS entry's field value.
+     *
+     * @param other another BibEntry from which fields are sourced from
+     */
+    public void mergeWith(BibEntry other) {
+        mergeWith(other, Set.of());
+    }
+
+    /**
+     * Merge this entry's fields with another BibEntry. Non-intersecting fields will be automatically merged. In cases of
+     * intersection, priority is given to THIS entry's field value, UNLESS specified otherwise in the arguments.
+     *
+     * @param other another BibEntry from which fields are sourced from
+     * @param otherPrioritizedFields collection of Fields in which 'other' has a priority into final result
+     */
+    public void mergeWith(BibEntry other, Set<Field> otherPrioritizedFields) {
+        Set<Field> thisFields = new TreeSet<>(Comparator.comparing(Field::getName));
+        Set<Field> otherFields = new TreeSet<>(Comparator.comparing(Field::getName));
+
+        thisFields.addAll(this.getFields());
+        otherFields.addAll(other.getFields());
+
+        // At the moment, "Field" interface does not provide explicit equality, so using their names instead.
+        Set<String> thisFieldsNames = thisFields.stream().map(Field::getName).collect(Collectors.toSet());
+        Set<String> otherPrioritizedFieldsNames = otherPrioritizedFields.stream().map(Field::getName).collect(Collectors.toSet());
+
+        for (Field otherField : otherFields) {
+            Optional<String> otherFieldValue = other.getField(otherField);
+            if (!thisFieldsNames.contains(otherField.getName()) ||
+                    otherPrioritizedFieldsNames.contains(otherField.getName())) {
+                // As iterator only goes through non-null fields from OTHER, otherFieldValue can never be empty
+                otherFieldValue.ifPresent(s -> this.setField(otherField, s));
+            }
+        }
     }
 }
