@@ -6,6 +6,10 @@ import org.jabref.build.xjc.XjcTask
 plugins {
     id 'application'
 
+    // Gradle license report plugin
+    // Erzeugt report für Lizenzen aller Abhängigkeiten
+    id 'com.github.jk1.dependency-license-report' version '2.5'
+
     id 'com.github.andygoossens.modernizer' version '1.7.0'
 
     id 'me.champeau.gradle.jmh' version '0.5.3'
