@@ -16,6 +16,25 @@ import org.jabref.logic.l10n.Localization;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Handles loading and managing protected terms lists, both internal and external.
+ *
+ * <p>
+ * This class provides functionality to update and manage protected terms lists used within JabRef.
+ * It supports both internal lists bundled with the application and external lists specified by the user.
+ * The lists are used to mark terms that should not be changed during BibTeX/BibLaTeX export.
+ * </p>
+ * <p>
+ * {@link ProtectedTermsLoader} enables users to customize and extend the set of protected terms.
+ * </p>
+ * <p>
+ * For example, to add a new internal protected terms list, use:
+ * <pre>{@code
+ * ProtectedTermsLoader protectedTermsLoader = new ProtectedTermsLoader(preferences);
+ * protectedTermsLoader.addNewProtectedTermsList("My Custom List", "/path/to/terms.terms");
+ * }</pre>
+ * </p>
+ */
 public class ProtectedTermsLoader {
 
     private static final Map<String, Supplier<String>> INTERNAL_LISTS = new HashMap<>();
@@ -34,6 +53,11 @@ public class ProtectedTermsLoader {
         update(preferences);
     }
 
+    /**
+     * Gets a list of internal protected terms lists available in the application.
+     *
+     * @return A list of internal protected terms lists.
+     */
     public static List<String> getInternalLists() {
         return new ArrayList<>(INTERNAL_LISTS.keySet());
     }
@@ -133,6 +157,14 @@ public class ProtectedTermsLoader {
         return mainList.remove(termList);
     }
 
+    /**
+     * Adds a new protected terms list with the specified description, location, and enabled status.
+     *
+     * @param newDescription The description of the new protected terms list.
+     * @param newLocation    The location (file path or resource) of the new protected terms list.
+     * @param enabled        {@code true} if the new list should be enabled, {@code false} otherwise.
+     * @return The newly created {@link ProtectedTermsList}.
+     */
     public ProtectedTermsList addNewProtectedTermsList(String newDescription, String newLocation, boolean enabled) {
         Objects.requireNonNull(newDescription);
         Objects.requireNonNull(newLocation);
